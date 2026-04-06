@@ -6,9 +6,8 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
-import { type Step, steps, type QuizStepDef } from '@/data/quiz-steps'
+import { type QuizStepDef, type Step, steps } from '@/data/quiz-steps'
 import { cn, getPercent } from '@/lib/utils'
-
 
 type LeadFormData = {
   name: string
@@ -19,93 +18,70 @@ type State = {
   steps: Step[]
   answers: Set<string>[]
 }
-type ActionBack = { type: 'back' }
-type ActionNext = { type: 'next', payload: Step }
-type ActionUpdate = { type: 'update'; payload: Set<string> }
-type ActionToggle = { type: 'toggle'; payload: string }
 
-type Action = ActionBack | ActionNext | ActionUpdate | ActionToggle 
-
-const reducer = (state: State, action: Action): State => {
-  if (action.type === 'back') {
-    return {
-      steps: state.steps.slice(0, -1),
-      answers: state.answers.slice(0, -1),
-    }
-  }
-  if (action.type === 'next') {
-    return {
-      steps: [ ...state.steps, action.payload ],
-      answers: [ ...state.answers, new Set<string>() ],
-    }
-  }
-  if (action.type === 'update') {
-    return {
-      steps: [ ...state.steps ],
-      answers: [ ...state.answers.slice(0, -1), action.payload ],
-    }
-  }
-  if (action.type === 'toggle') {
-    const answer = new Set(state.answers.at(-1) ?? [])
-    if (answer.has(action.payload)) {
-      answer.delete(action.payload)
-    } else {
-      answer.add(action.payload)
-    }
-
-    return {
-      steps: [ ...state.steps ],
-      answers: [ ...state.answers.slice(0, -1), answer ],
-    }
-  }
-  throw Error('Unknown action.');
-}
+type Action =
+  | { type: 'back' }
+  | { type: 'next'; payload: Step }
+  | { type: 'update'; payload: Set<string> }
+  | { type: 'toggle'; payload: string }
 
 const initialState: State = { steps: ['product'], answers: [new Set<string>()] }
 
+const reducer = (state: State, action: Action): State => {
+  switch (action.type) {
+    case 'back':
+      return {
+        steps: state.steps.slice(0, -1),
+        answers: state.answers.slice(0, -1),
+      }
+    case 'next':
+      return {
+        steps: [...state.steps, action.payload],
+        answers: [...state.answers, new Set<string>()],
+      }
+    case 'update':
+      return {
+        steps: [...state.steps],
+        answers: [...state.answers.slice(0, -1), action.payload],
+      }
+    case 'toggle': {
+      const answer = new Set(state.answers.at(-1) ?? [])
+      if (answer.has(action.payload)) {
+        answer.delete(action.payload)
+      } else {
+        answer.add(action.payload)
+      }
+      return {
+        steps: [...state.steps],
+        answers: [...state.answers.slice(0, -1), answer],
+      }
+    }
+    default:
+      return state
+  }
+}
+
 export const QuizFlow: React.FC = () => {
-  const [state, dispatch] = useReducer(reducer, initialState);
+  const [state, dispatch] = useReducer(reducer, initialState)
+  const [formData, setFormData] = React.useState<LeadFormData>({ name: '', phone: '' })
 
-  const [formData, setFormData] = React.useState<LeadFormData>({
-    name: '',
-    phone: '',
-  });
-
-  const step = steps.get(state.steps.at(-1) as Step) as QuizStepDef
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  }
-
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    console.log(formData)
-    console.log(state)
-    console.log(steps.get(state.steps.at(-1)!)!.options[0].next)
-    handleNext(steps.get(state.steps.at(-1)!)!.options[0].next)
-  }
-
-  const handleBack = () => {
-    dispatch({ type: 'back' })
-  }
-
-  const handleToggle = (optId: string) => {
-    dispatch({ type: 'toggle', payload: optId })
-  }
-
-  const handleSelect = (values: Set<string>) => {
-    dispatch({ type: 'update', payload: values })
-  } 
-
-  const handleNext = (next: Step) => {
-    dispatch({ type: 'next', payload: next })
-  }
-
-  const total = state.answers.length + step?.tail
-
+  const currentStepId = state.steps.at(-1) ?? 'product'
+  const step = steps.get(currentStepId) as QuizStepDef
+  const currentAnswers = state.answers.at(-1) ?? new Set<string>()
+  const total = state.answers.length + step.tail
   const progress = getPercent(state.answers.length, total)
 
-  if (state.steps.at(-1) === 'success') {
+  const handleBack = () => dispatch({ type: 'back' })
+  const handleNext = (next: Step) => dispatch({ type: 'next', payload: next })
+  const handleToggle = (optionId: string) => dispatch({ type: 'toggle', payload: optionId })
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    // В MVP имитируем отправку формы, реальную интеграцию добавим на API/CRM.
+    handleNext('success')
+  }
+
+  if (currentStepId === 'success') {
     return (
       <Card className="mx-auto w-full max-w-lg">
         <CardHeader className="text-center">
@@ -121,7 +97,7 @@ export const QuizFlow: React.FC = () => {
     )
   }
 
-  if (state.steps.at(-1) === 'result') {
+  if (currentStepId === 'result') {
     return (
       <Card className="mx-auto w-full max-w-lg">
         <CardHeader>
@@ -129,9 +105,7 @@ export const QuizFlow: React.FC = () => {
             <Progress value={progress} />
           </div>
           <CardTitle>{step.title}</CardTitle>
-          <CardDescription className="text-base text-foreground/90">
-            {step.description}
-          </CardDescription>
+          <CardDescription className="text-base text-foreground/90">{step.description}</CardDescription>
         </CardHeader>
         <CardContent>
           <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
@@ -142,7 +116,7 @@ export const QuizFlow: React.FC = () => {
                 name="name"
                 autoComplete="name"
                 value={formData.name}
-                onChange={handleChange}
+                onChange={(event) => setFormData((prev) => ({ ...prev, name: event.target.value }))}
                 required
                 placeholder="Как к вам обращаться"
               />
@@ -156,12 +130,12 @@ export const QuizFlow: React.FC = () => {
                 autoComplete="tel"
                 inputMode="tel"
                 value={formData.phone}
-                onChange={handleChange}
+                onChange={(event) => setFormData((prev) => ({ ...prev, phone: event.target.value }))}
                 required
-                placeholder="+7 …"
+                placeholder="+7 ..."
               />
             </div>
-            <Button type="submit" variant="default" className="w-full sm:w-auto">
+            <Button type="submit" className="w-full sm:w-auto">
               Получить расчёт
             </Button>
           </form>
@@ -191,12 +165,11 @@ export const QuizFlow: React.FC = () => {
         {step.multi ? (
           <>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {step.options.map((opt) => {
-                const answer = state.answers.at(-1)!
-                const checked = answer.has(opt.id)
+              {step.options.map((option) => {
+                const checked = currentAnswers.has(option.id)
                 return (
                   <label
-                    key={opt.id}
+                    key={option.id}
                     className={cn(
                       'flex cursor-pointer items-center gap-3 rounded-lg border-2 p-4 transition-colors',
                       checked ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40',
@@ -204,13 +177,13 @@ export const QuizFlow: React.FC = () => {
                   >
                     <Checkbox
                       checked={checked}
-                      onCheckedChange={() => handleToggle(opt.id)}
-                      aria-label={opt.label}
+                      onCheckedChange={() => handleToggle(option.id)}
+                      aria-label={option.label}
                     />
                     <span className="text-2xl" aria-hidden>
-                      {opt.emoji}
+                      {option.emoji}
                     </span>
-                    <span className="font-medium text-foreground">{opt.label}</span>
+                    <span className="font-medium text-foreground">{option.label}</span>
                   </label>
                 )
               })}
@@ -218,8 +191,7 @@ export const QuizFlow: React.FC = () => {
             <Button
               type="button"
               className="w-full sm:w-auto"
-              variant="default"
-              disabled={state.answers.length < 2}
+              disabled={currentAnswers.size === 0}
               onClick={() => handleNext(step.options[0].next)}
             >
               Далее
@@ -227,35 +199,35 @@ export const QuizFlow: React.FC = () => {
           </>
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {step.options.map((opt) => (
+            {step.options.map((option) => (
               <button
-                key={opt.id}
+                key={option.id}
                 type="button"
                 className={cn(
                   'flex min-h-22 flex-col items-center justify-center gap-2 rounded-lg border-2 border-border bg-card p-4 text-center transition-colors',
                   'hover:border-primary hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                 )}
                 onClick={() => {
-                  handleSelect(new Set([opt.id]))
-                  handleNext(opt.next)
+                  dispatch({ type: 'update', payload: new Set([option.id]) })
+                  handleNext(option.next)
                 }}
               >
                 <span className="text-3xl" aria-hidden>
-                  {opt.emoji}
+                  {option.emoji}
                 </span>
-                <span className="text-sm font-semibold text-foreground">{opt.label}</span>
+                <span className="text-sm font-semibold text-foreground">{option.label}</span>
               </button>
             ))}
           </div>
         )}
       </CardContent>
-      {(state.answers.length > 1) && (
+      {state.answers.length > 1 ? (
         <CardFooter className="border-t border-border pt-4">
           <Button type="button" variant="ghost" onClick={handleBack}>
             Назад
           </Button>
         </CardFooter>
-      )}
+      ) : null}
     </Card>
   )
 }

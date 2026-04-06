@@ -1,8 +1,13 @@
-/** Не шаг из массива — переход к форме лида в UI */
-export const QUIZ_LEAD_NEXT = 'lead' as const
-
-export type Step = 'product' | 'goal' | 'marketplace' | 'import_supply' | 'production' | 'urgency' | 'documents' | 'result' | 'success' | 'finish'
-
+export type Step =
+  | 'product'
+  | 'goal'
+  | 'marketplace'
+  | 'import_supply'
+  | 'production'
+  | 'urgency'
+  | 'documents'
+  | 'result'
+  | 'success'
 
 export type QuizOption = {
   id: string
@@ -17,11 +22,10 @@ export type QuizStepDef = {
   subtitle?: string
   description?: string
   options: QuizOption[]
-  multi?: boolean // если можно выбирать несколько ответов
-  tail: number // сколько осталось шагов в лучшем случае
+  multi?: boolean
+  tail: number
 }
 
-// tail можно рассчитать алгоритмом
 export const quizSteps: QuizStepDef[] = [
   {
     id: 'product',
@@ -35,7 +39,7 @@ export const quizSteps: QuizStepDef[] = [
       { id: 'food', emoji: '🍎', label: 'Пищевые продукты', next: 'goal' },
       { id: 'other', emoji: '📎', label: 'Другое', next: 'goal' },
     ],
-    tail: 6, // осталось 6 шагов
+    tail: 6,
   },
   {
     id: 'goal',
@@ -52,7 +56,6 @@ export const quizSteps: QuizStepDef[] = [
         next: 'production',
       },
     ],
-    
     tail: 5,
   },
   {
@@ -115,119 +118,18 @@ export const quizSteps: QuizStepDef[] = [
   {
     id: 'result',
     title: 'Получить расчёт',
-    description: 'Мы рассчитали предварительную стоимость и сроки под ваш товар. Учтены требования законодательства РФ — детали уточнит специалист',
-    options: [ { id: 'calculate', emoji: '🧮', label: 'Да, полный комплект', next: 'success' },],
+    description:
+      'Мы рассчитали предварительную стоимость и сроки под ваш товар. Учтены требования законодательства РФ, расчёт подготовит специалист.',
+    options: [{ id: 'calculate', emoji: '🧮', label: 'Получить расчёт', next: 'success' }],
     tail: 1,
   },
   {
     id: 'success',
     title: 'Успех',
-    description: 'Мы рассчитали предварительную стоимость и сроки под ваш товар. Учтены требования законодательства РФ — детали уточнит специалист',
+    description: 'Спасибо, заявка принята. Специалист свяжется с вами в течение ~2 минут.',
     options: [],
     tail: 0,
   },
 ]
 
 export const steps = new Map(quizSteps.map((s) => [s.id, s]))
-
-
-/**
- * Описание ребра (перехода) между вершинами графа.
- * Содержит идентификатор, отображаемые данные и целевую вершину.
- */
-export interface Option {
-  id: string;
-  emoji?: string;
-  label?: string;
-  next: string; // id вершины, в которую ведёт ребро
-}
-
-/**
- * Шаг истории: из какой вершины, по какому ребру и в какую вершину был совершён переход.
- */
-export interface Jump {
-  prev: string
-  next: string
-  option: Option
-}
-
-/**
- * Хранит путь посещённых вершин графа и выбранные рёбра переходов.
- * Позволяет перемещаться назад по истории.
- */
-export class PathTracker {
-  private jumps: Jump[] = []
-  private currentNodeId: string
-  private initialNodeId: string
-
-  /**
-   * @param initialNodeId - id начальной вершины (точка входа в граф)
-   */
-  constructor(initialNodeId: string) {
-    this.initialNodeId = initialNodeId
-    this.currentNodeId = initialNodeId
-  }
-
-  /**
-   * Текущая вершина (последняя посещённая).
-   */
-  getCurrentNode(): string {
-    return this.currentNodeId
-  }
-
-  /**
-   * Все совершённые шаги в порядке выполнения.
-   */
-  getJumps(): Jump[] {
-    return [...this.jumps]
-  }
-
-  /**
-   * Полный путь вершин от начальной до текущей.
-   */
-  getNodesPath(): string[] {
-    const nodes: string[] = [this.initialNodeId]
-    for (const { next } of this.jumps) {
-      nodes.push(next)
-    }
-    return nodes
-  }
-
-  /**
-   * Совершить переход по заданному ребру.
-   * @param option - выбранное ребро (должно содержать поле next)
-   * @throws Если у ребра отсутствует целевая вершина (next)
-   */
-  forward(option: Option): void {
-    if (!option.next) {
-      throw new Error('Option must have a "next" field');
-    }
-    const jump: Jump = {
-      prev: this.currentNodeId,
-      next: option.next,
-      option: { ...option }, // копируем, чтобы избежать внешних мутаций
-    }
-    this.jumps.push(jump)
-    this.currentNodeId = option.next
-  }
-
-  /**
-   * Вернуться на один шаг назад.
-   * @returns true, если шаг был совершён, false – если история пуста
-   */
-  back(): boolean {
-    if (!this.jumps.length) return false;
-    this.jumps.pop()
-    this.currentNodeId = this.jumps.length
-      ? this.jumps[this.jumps.length - 1].next
-      : this.initialNodeId
-    return true;
-  }
-
-  /**
-   * Проверить, можно ли вернуться назад.
-   */
-  canGoBack(): boolean {
-    return Boolean(this.jumps.length)
-  }
-}
