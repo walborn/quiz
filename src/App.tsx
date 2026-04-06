@@ -159,7 +159,7 @@ function App() {
 						className="w-full sm:w-auto cursor-pointer"
 						asChild
 					>
-						<a href="#quiz">Консультация</a>
+						<a href="#lead-form">Консультация</a>
 					</Button>
 				</div>
 			</header>
